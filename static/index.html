@@ -91,8 +91,21 @@ function streak(id){let d=new Date(),n=0;if(!done(id,iso(d)))d=addDays(d,-1);
   while(done(id,iso(d))){n++;d=addDays(d,-1)}return n}
 function bestStreak(id){let b=0,c=0;for(let i=120;i>=0;i--){if(done(id,iso(addDays(new Date(),-i)))){c++;b=Math.max(b,c)}else c=0}return b}
 function weekCount(id){const m=monday(new Date());let n=0;for(let i=0;i<7;i++)if(done(id,iso(addDays(m,i))))n++;return n}
-function toggle(id){const d=iso(new Date());const a=S.logs[d]||(S.logs[d]=[]);const i=a.indexOf(id);i<0?a.push(id):a.splice(i,1);render();
-  api('/api/habits/'+id+'/toggle',{method:'POST',body:JSON.stringify({date:d})}).catch(()=>{const j=a.indexOf(id);j<0?a.push(id):a.splice(j,1);render()})}
+async function toggle(id){const d=iso(new Date());const a=S.logs[d]||(S.logs[d]=[]);const i=a.indexOf(id);i<0?a.push(id):a.splice(i,1);render();
+  try{await api('/api/habits/'+id+'/toggle',{method:'POST',body:JSON.stringify({date:d})})}
+  catch(){
+    // Offline: queue in IndexedDB and register background sync
+    const j=a.indexOf(id);j<0?a.push(id):a.splice(j,1);render();
+    if('serviceWorker' in navigator){
+      try{
+        const reg=await navigator.serviceWorker.ready;
+        const dbReq=indexedDB.open('stride-sync',1);
+        dbReq.onsuccess=()=>{const tx=dbReq.result.transaction('pending','readwrite');tx.objectStore('pending').add({habitId:id,date:d,timestamp:Date.now()})};
+        if('sync' in reg)await reg.sync.register('sync-toggles');
+      }catch(){}
+    }
+  }
+}
 
 function ring(p,c,size){const r=size/2-6,L=2*Math.PI*r;
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="8"/><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-dasharray="${L*p} ${L}" transform="rotate(-90 ${size/2} ${size/2})"/></svg>`}
@@ -167,8 +180,34 @@ function render(){
 $('#main').addEventListener('click',e=>{const t=e.target.closest('[data-t]'),x=e.target.closest('[data-e]');if(t)toggle(t.dataset.t);if(x)sheet(x.dataset.e)});
 document.querySelector('nav').addEventListener('click',e=>{const b=e.target.closest('button');if(b){view=b.dataset.v;render();$('#main').scrollTop=0}});
 $('#fab').onclick=()=>sheet();
+
+// ── Handle shortcut URL params (?view=today|stats|habits) ──
+const urlView=new URLSearchParams(location.search).get('view');
+if(['today','stats','habits'].includes(urlView))view=urlView;
+
+// ── Service Worker + PWA features ──
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').then(async reg=>{
+    // ── Request notification permission ──
+    if('Notification' in window && Notification.permission==='default'){
+      const p=await Notification.requestPermission();
+      if(p==='granted'){
+        // ── Register Periodic Sync for daily reminders ──
+        if('periodicSync' in reg){
+          try{
+            await reg.periodicSync.register('daily-reminder',{minInterval:24*60*60*1000});
+          }catch(e){console.log('Periodic sync not available:',e)}
+        }
+      }
+    }else if(Notification.permission==='granted'&&'periodicSync' in reg){
+      try{
+        await reg.periodicSync.register('daily-reminder',{minInterval:24*60*60*1000});
+      }catch(e){}
+    }
+  }).catch(()=>{});
+}
+
 load().then(ok=>{if(ok)render()});
-if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
 </script>
 </body>
 </html>

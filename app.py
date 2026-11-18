@@ -198,6 +198,15 @@ def manifest():
     return send_from_directory("static", "manifest.webmanifest", mimetype="application/manifest+json")
 
 
+@app.get("/share-target")
+def share_target():
+    """Handle PWA share target — redirect to home with shared text as a new habit name hint."""
+    title = request.args.get("title", "") or request.args.get("text", "")
+    if title:
+        return send_from_directory("static", "index.html")
+    return send_from_directory("static", "index.html")
+
+
 # ---------- demo data ----------
 def seed():
     init_db()
