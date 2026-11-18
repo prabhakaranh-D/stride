@@ -132,13 +132,27 @@ def delete_habit(hid):
 @app.get("/api/logs")
 def get_logs():
     """Returns {"2026-11-18": ["habitId", ...]} for the last N days."""
-    days = min(365, max(1, request.args.get("days", 120, type=int)))
+    days = min(730, max(1, request.args.get("days", 365, type=int)))
     since = (date.today() - timedelta(days=days)).isoformat()
     rows = db().execute("SELECT habit_id, day FROM logs WHERE day >= ?", (since,)).fetchall()
     out = {}
     for r in rows:
         out.setdefault(r["day"], []).append(r["habit_id"])
     return jsonify(out)
+
+
+@app.get("/api/export")
+def export_data():
+    """Export all habits, logs, and calculated stats as JSON download."""
+    habits = [dict(r) for r in db().execute("SELECT * FROM habits ORDER BY created_at").fetchall()]
+    logs = [dict(r) for r in db().execute("SELECT habit_id, day FROM logs ORDER BY day DESC").fetchall()]
+    return jsonify({
+        "exported_at": date.today().isoformat(),
+        "total_habits": len(habits),
+        "total_checkins": len(logs),
+        "habits": habits,
+        "logs": logs
+    })
 
 
 @app.post("/api/habits/<hid>/toggle")
@@ -205,6 +219,24 @@ def share_target():
     if title:
         return send_from_directory("static", "index.html")
     return send_from_directory("static", "index.html")
+
+
+@app.get("/.well-known/assetlinks.json")
+def assetlinks():
+    """Serve Digital Asset Links for Android Trusted Web Activity (TWA)."""
+    well_known_dir = os.path.join(app.root_path, "static", ".well-known")
+    if os.path.exists(os.path.join(well_known_dir, "assetlinks.json")):
+        return send_from_directory(well_known_dir, "assetlinks.json", mimetype="application/json")
+    return jsonify([{
+        "relation": ["delegate_permission/common.handle_all_urls"],
+        "target": {
+            "namespace": "android_app",
+            "package_name": "com.onrender.stride_2_83gv.twa",
+            "sha256_cert_fingerprints": [
+                "58:70:CD:88:97:CE:A9:21:12:30:DA:43:66:7D:35:9C:EF:9A:26:AD:5B:D9:D9:64:93:1B:39:78:AD:67:8C:22"
+            ]
+        }
+    }])
 
 
 # ---------- demo data ----------
