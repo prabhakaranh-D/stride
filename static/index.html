@@ -295,6 +295,75 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:12px 0}
 }
 .toast.show{opacity:1;transform:none}
 
+/* ── TIMEFRAME SELECTOR ──────────────────────────────── */
+.tf-nav{
+  display:flex;background:var(--surface2);border-radius:12px;padding:3px;gap:4px;margin-bottom:14px;
+}
+.tf-btn{
+  flex:1;padding:8px 0;border:none;background:transparent;color:var(--text2);
+  font:inherit;font-size:12px;font-weight:700;letter-spacing:.3px;border-radius:9px;
+  cursor:pointer;transition:all .2s var(--ease);text-align:center;
+}
+.tf-btn.on{
+  background:var(--surface);color:var(--text);box-shadow:var(--sh-sm);font-weight:800;
+}
+
+/* ── ACHIEVEMENT BANNER & MODAL ───────────────────────── */
+.achieve-banner{
+  background:linear-gradient(135deg,#1c1b29 0%,#35314a 100%);
+  border-radius:var(--r);padding:14px 16px;margin-bottom:14px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  color:#fff;box-shadow:var(--sh-sm);position:relative;overflow:hidden;
+}
+.achieve-banner::after{
+  content:'';position:absolute;top:-25px;right:-25px;width:90px;height:90px;
+  border-radius:50%;background:rgba(252,76,2,.25);pointer-events:none;
+}
+:root[data-theme="dark"] .achieve-banner{background:linear-gradient(135deg,#15141d 0%,#29263a 100%)}
+.ach-left{display:flex;align-items:center;gap:12px;min-width:0;position:relative;z-index:1}
+.ach-icon{font-size:32px;flex-shrink:0}
+.ach-title{font-size:14px;font-weight:800;display:block;letter-spacing:-.2px}
+.ach-sub{font-size:11px;opacity:.82;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ach-dl-btn{
+  background:var(--accent);color:#fff;border:none;border-radius:10px;
+  padding:9px 13px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;
+  display:inline-flex;align-items:center;gap:5px;flex-shrink:0;box-shadow:0 3px 12px rgba(252,76,2,.4);
+  transition:transform .15s;position:relative;z-index:1;
+}
+.ach-dl-btn:active{transform:scale(.95)}
+
+.modal-canvas-wrap{
+  border-radius:16px;overflow:hidden;margin:14px auto;background:#0d0d11;
+  box-shadow:var(--sh-lg);display:flex;justify-content:center;max-width:300px;
+}
+.modal-canvas-wrap canvas{
+  width:100%;height:auto;display:block;border-radius:14px;
+}
+.btn-row{display:flex;gap:8px}
+.btn-row .btn{flex:1;padding:12px 8px;font-size:13px}
+
+/* ── CHARTS (MONTH & YEAR) ───────────────────────────── */
+.chart-subtitle{font-size:11px;color:var(--text2);margin-top:-8px;margin-bottom:12px;font-weight:500}
+.m30-chart{display:flex;align-items:flex-end;gap:3px;height:96px;padding:0 1px}
+.m30-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%}
+.m30-bar-wrap{flex:1;width:100%;display:flex;align-items:flex-end}
+.m30-bar{width:100%;min-height:3px;border-radius:3px 3px 0 0;background:var(--surface2);transition:height .4s var(--ease)}
+.m30-bar.hi{background:var(--accent)}
+.m30-day{font-size:8px;color:var(--text2);font-weight:600}
+
+.y12-chart{display:flex;align-items:flex-end;gap:5px;height:105px;padding:0 2px}
+.y12-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%}
+.y12-bar-wrap{flex:1;width:100%;display:flex;align-items:flex-end}
+.y12-bar{width:100%;min-height:4px;border-radius:4px 4px 0 0;background:var(--surface2);transition:height .4s var(--ease)}
+.y12-bar.hi{background:var(--accent)}
+.y12-bar.top{background:linear-gradient(180deg,#fc4c02,#ff9800)}
+.y12-lbl{font-size:10px;color:var(--text2);font-weight:700}
+.y12-cnt{font-size:9px;font-weight:700;color:var(--text);margin-bottom:2px}
+
+.hof-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.hof-row:last-child{border-bottom:none}
+.hof-rank{font-size:20px;font-weight:800;width:28px;text-align:center;flex-shrink:0}
+
 /* ── A11Y ────────────────────────────────────────────── */
 button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 </style>
@@ -335,6 +404,7 @@ const MOTIV=['Every habit counts. Keep going!','You\'re building something great
 /* ── STATE ───────────────────────────────────────────── */
 let S={habits:[],logs:{}};
 let view='today';
+let statsTimeframe='week'; // 'week' | 'month' | 'year'
 
 /* ── UTILS ───────────────────────────────────────────── */
 const $=s=>document.querySelector(s);
@@ -361,7 +431,7 @@ async function api(path,opt){
 }
 async function load(){
   try{
-    [S.habits,S.logs]=await Promise.all([api('/api/habits'),api('/api/logs?days=130')]);
+    [S.habits,S.logs]=await Promise.all([api('/api/habits'),api('/api/logs?days=365')]);
     return true;
   }catch(e){
     $('#main').innerHTML=`<div class="empty"><div class="ei">📡</div><h3>Can't reach server</h3><p>Check your connection and reload.</p></div>`;
@@ -371,8 +441,17 @@ async function load(){
 
 /* ── HELPERS ─────────────────────────────────────────── */
 function streak(id){let d=new Date(),n=0;if(!done(id,iso(d)))d=addDays(d,-1);while(done(id,iso(d))){n++;d=addDays(d,-1)}return n}
-function bestStreak(id){let b=0,c=0;for(let i=120;i>=0;i--){done(id,iso(addDays(new Date(),-i)))?(c++,b=Math.max(b,c)):c=0}return b}
+function bestStreak(id){let b=0,c=0;for(let i=365;i>=0;i--){done(id,iso(addDays(new Date(),-i)))?(c++,b=Math.max(b,c)):c=0}return b}
 function weekCount(id){const m=monday(new Date());let n=0;for(let i=0;i<7;i++)if(done(id,iso(addDays(m,i))))n++;return n}
+function countDays(id,days){let n=0;const today=new Date();for(let i=0;i<days;i++)if(done(id,iso(addDays(today,-i))))n++;return n}
+
+function getAchievement(totalCheckins, bestStreakVal){
+  if(totalCheckins>=150||bestStreakVal>=40) return {title:'Titan of Discipline',emoji:'👑',rank:'Level 5 · Master',desc:'Unrivaled consistency and daily mastery'};
+  if(totalCheckins>=75||bestStreakVal>=21) return {title:'Streak Champion',emoji:'⚡',rank:'Level 4 · Diamond',desc:'Deep momentum and formidable habit loops'};
+  if(totalCheckins>=35||bestStreakVal>=10) return {title:'Habit Warrior',emoji:'🏆',rank:'Level 3 · Gold',desc:'Consistent daily actions turning into identity'};
+  if(totalCheckins>=12||bestStreakVal>=4) return {title:'Momentum Builder',emoji:'🔥',rank:'Level 2 · Silver',desc:'Solid foundation and steady daily progress'};
+  return {title:'Habit Architect',emoji:'🌱',rank:'Level 1 · Bronze',desc:'Taking the initial bold strides towards growth'};
+}
 function greeting(){const h=new Date().getHours();if(h<12)return'Good morning ☀️';if(h<17)return'Good afternoon 👋';if(h<21)return'Good evening 🌆';return'Good night 🌙'}
 
 function weekDots(id){
@@ -455,73 +534,564 @@ function vStats(){
   if(!H.length)return`<div class="empty"><div class="ei">📊</div><h3>No data yet</h3><p>Add a habit and start tracking to see your progress here.</p></div>`;
 
   const today=new Date();
-  let tot=0,poss=0;
-  for(let i=0;i<30;i++){const d=iso(addDays(today,-i));tot+=H.filter(h=>done(h.id,d)).length;poss+=H.length}
-  const cons=poss?Math.round(tot/poss*100):0;
-  const best=H.length?Math.max(...H.map(h=>bestStreak(h))):0;
-  const wk=H.reduce((a,h)=>a+weekCount(h.id),0);
 
-  // Bar chart
-  const bars=Array.from({length:7},(_,i)=>{
-    const d=addDays(today,i-6),c=H.filter(h=>done(h.id,iso(d))).length;
-    return{l:DAYS[(d.getDay()+6)%7],p:H.length?c/H.length:0,isToday:i===6};
-  });
-  const barHTML=bars.map(b=>`<div class="bar-col">
-    <div class="bar-wrap"><div class="bar-fill${b.p>0?' hi':''}" style="height:${Math.max(4,Math.round(b.p*96))}px"></div></div>
-    <div class="bar-day${b.isToday?' cur':''}">${b.l}</div>
-  </div>`).join('');
+  // All-time & Year stats
+  let totalYear=0;
+  for(let i=0;i<365;i++){
+    const d=iso(addDays(today,-i));
+    totalYear+=(S.logs[d]||[]).length;
+  }
+  const bestAll=H.length?Math.max(...H.map(h=>bestStreak(h.id))):0;
+  const yearPoss=365*H.length;
+  const yearCons=yearPoss>0?Math.round(totalYear/yearPoss*100):0;
+  const ach=getAchievement(totalYear,bestAll);
 
-  // Heatmap
-  const start=addDays(monday(today),-77);
-  let cells='';
-  for(let w=0;w<12;w++)for(let d=0;d<7;d++){
-    const dt=addDays(start,w*7+d);if(dt>today)continue;
-    const p=H.length?H.filter(h=>done(h.id,iso(dt))).length/H.length:0;
-    const op=p===0?0:(.2+p*.8);
-    cells+=`<rect x="${w*22}" y="${d*22}" width="18" height="18" rx="4"
-      fill="${p?'var(--accent)':'var(--surface2)'}" ${p?`fill-opacity="${op.toFixed(2)}"`:''}>
-      <title>${iso(dt)}: ${H.filter(h=>done(h.id,iso(dt))).length}/${H.length}</title></rect>`;
+  // Timeframe selector
+  const tfSelector=`<div class="tf-nav">
+    <button class="tf-btn ${statsTimeframe==='week'?'on':''}" data-tf="week">Weekly</button>
+    <button class="tf-btn ${statsTimeframe==='month'?'on':''}" data-tf="month">Monthly</button>
+    <button class="tf-btn ${statsTimeframe==='year'?'on':''}" data-tf="year">Yearly</button>
+  </div>`;
+
+  // Achievement Spotlight banner
+  const achBanner=`<div class="achieve-banner">
+    <div class="ach-left">
+      <span class="ach-icon">${ach.emoji}</span>
+      <div>
+        <span class="ach-title">${ach.title}</span>
+        <span class="ach-sub">${ach.rank} · ${totalYear} check-ins</span>
+      </div>
+    </div>
+    <button class="ach-dl-btn" data-act="ach-modal">🏆 Achievement</button>
+  </div>`;
+
+  let content='';
+
+  /* ──────────────── WEEKLY VIEW ──────────────── */
+  if(statsTimeframe==='week'){
+    const wk=H.reduce((a,h)=>a+weekCount(h.id),0);
+    const totalGoal=H.reduce((a,h)=>a+h.goal,0);
+    const wkPct=totalGoal>0?Math.min(100,Math.round(wk/totalGoal*100)):0;
+    const bestWk=H.length?Math.max(...H.map(h=>streak(h.id))):0;
+
+    // 7-day bar chart
+    const bars=Array.from({length:7},(_,i)=>{
+      const d=addDays(today,i-6),cnt=(S.logs[iso(d)]||[]).length;
+      return{l:DAYS[(d.getDay()+6)%7],p:H.length?cnt/H.length:0,cnt,isToday:i===6,date:iso(d)};
+    });
+    const barHTML=bars.map(b=>`<div class="bar-col">
+      <div class="bar-wrap"><div class="bar-fill${b.p>0?' hi':''}" style="height:${Math.max(4,Math.round(b.p*96))}px" title="${b.date}: ${b.cnt} habits"></div></div>
+      <div class="bar-day${b.isToday?' cur':''}">${b.l}</div>
+    </div>`).join('');
+
+    const habitBars=H.map(h=>{
+      const c=weekCount(h.id),p=Math.min(1,c/h.goal),s=streak(h.id);
+      return`<div class="hp-row">
+        <div class="hp-top">
+          <span class="hp-ico">${h.emoji}</span>
+          <span class="hp-name">${esc(h.name)}</span>
+          <span class="hp-cnt" style="color:${h.color}">${c}/${h.goal} days</span>
+        </div>
+        <div class="hp-bar"><div class="hp-fill" style="width:${Math.round(p*100)}%;background:${h.color}"></div></div>
+        <div class="hp-sub">🔥 ${s}-day streak &nbsp;·&nbsp; ${p>=1?'🎯 Goal reached this week!':'In progress'}</div>
+      </div>`;
+    }).join('');
+
+    content=`
+      <div class="stat-grid">
+        <div class="stat-card"><span class="stat-num">${wk}</span><span class="stat-lbl">Check-ins this week</span></div>
+        <div class="stat-card"><span class="stat-num">${wkPct}%</span><span class="stat-lbl">Weekly goal progress</span></div>
+        <div class="stat-card"><span class="stat-num">${bestWk}d</span><span class="stat-lbl">Current best streak</span></div>
+      </div>
+      <div class="card card-p">
+        <div class="card-title">Last 7 Days Activity</div>
+        <div class="bar-chart">${barHTML}</div>
+      </div>
+      <div class="card card-p">
+        <div class="card-title">Weekly Goals Breakdown</div>
+        <div class="hp-list">${habitBars}</div>
+      </div>
+    `;
   }
 
-  // Habit bars
-  const habitBars=H.map(h=>{
-    const c=weekCount(h.id),p=Math.min(1,c/h.goal),s=streak(h.id),bs=bestStreak(h.id);
-    return`<div class="hp-row">
-      <div class="hp-top">
-        <span class="hp-ico">${h.emoji}</span>
-        <span class="hp-name">${esc(h.name)}</span>
-        <span class="hp-cnt" style="color:${h.color}">${c}/${h.goal}</span>
+  /* ──────────────── MONTHLY VIEW ──────────────── */
+  else if(statsTimeframe==='month'){
+    let monthTotal=0,activeDays=0;
+    for(let i=0;i<30;i++){
+      const d=iso(addDays(today,-i));
+      const cnt=(S.logs[d]||[]).length;
+      monthTotal+=cnt;
+      if(cnt>0)activeDays++;
+    }
+    const monthCons=Math.round((monthTotal/(30*H.length))*100);
+
+    // 30-day bars
+    const mBars=Array.from({length:30},(_,i)=>{
+      const d=addDays(today,i-29),cnt=(S.logs[iso(d)]||[]).length;
+      const isLabel=i%5===0||i===29;
+      return`<div class="m30-col">
+        <div class="m30-bar-wrap">
+          <div class="m30-bar${cnt>0?' hi':''}" style="height:${Math.max(3,Math.round((cnt/H.length)*90))}px" title="${iso(d)}: ${cnt} done"></div>
+        </div>
+        ${isLabel?`<div class="m30-day">${d.getDate()}</div>`:''}
+      </div>`;
+    }).join('');
+
+    // Habit breakdown for 30 days
+    const habitMonthList=H.map(h=>{
+      const cnt=countDays(h.id,30),pct=Math.round(cnt/30*100);
+      return`<div class="hp-row">
+        <div class="hp-top">
+          <span class="hp-ico">${h.emoji}</span>
+          <span class="hp-name">${esc(h.name)}</span>
+          <span class="hp-cnt" style="color:${h.color}">${cnt}/30 days (${pct}%)</span>
+        </div>
+        <div class="hp-bar"><div class="hp-fill" style="width:${pct}%;background:${h.color}"></div></div>
+      </div>`;
+    }).join('');
+
+    // 6-week heatmap
+    const start6=addDays(monday(today),-35);
+    let cells6='';
+    for(let w=0;w<6;w++)for(let d=0;d<7;d++){
+      const dt=addDays(start6,w*7+d);if(dt>today)continue;
+      const p=H.length?(S.logs[iso(dt)]||[]).length/H.length:0;
+      const op=p===0?0:(.2+p*.8);
+      cells6+=`<rect x="${w*24}" y="${d*20}" width="20" height="16" rx="4"
+        fill="${p?'var(--accent)':'var(--surface2)'}" ${p?`fill-opacity="${op.toFixed(2)}"`:''}>
+        <title>${iso(dt)}: ${(S.logs[iso(dt)]||[]).length}/${H.length}</title></rect>`;
+    }
+
+    content=`
+      <div class="stat-grid">
+        <div class="stat-card"><span class="stat-num">${monthTotal}</span><span class="stat-lbl">30-day check-ins</span></div>
+        <div class="stat-card"><span class="stat-num">${monthCons}%</span><span class="stat-lbl">30-day consistency</span></div>
+        <div class="stat-card"><span class="stat-num">${activeDays}</span><span class="stat-lbl">Active days in month</span></div>
       </div>
-      <div class="hp-bar"><div class="hp-fill" style="width:${Math.round(p*100)}%;background:${h.color}"></div></div>
-      <div class="hp-sub">🔥 ${s}-day streak &nbsp;·&nbsp; 🏆 best ${bs} days</div>
-    </div>`;
-  }).join('');
+      <div class="card card-p">
+        <div class="card-title">Last 30 Days Daily Trend</div>
+        <p class="chart-subtitle">Daily consistency over the last month</p>
+        <div class="m30-chart">${mBars}</div>
+      </div>
+      <div class="card card-p">
+        <div class="card-title">Habit Consistency (30 Days)</div>
+        <div class="hp-list">${habitMonthList}</div>
+      </div>
+      <div class="card card-p">
+        <div class="card-title">Recent 6 Weeks Activity</div>
+        <div class="hmap-wrap">
+          <svg viewBox="0 0 148 144" width="100%" role="img" aria-label="Monthly heatmap">${cells6}</svg>
+        </div>
+      </div>
+    `;
+  }
 
-  const swatches=[0,.25,.5,.75,1].map(op=>`<span style="background:${op?'var(--accent)':'var(--surface2)'};opacity:${op?(.2+op*.8):1}"></span>`).join('');
+  /* ──────────────── YEARLY VIEW ──────────────── */
+  else if(statsTimeframe==='year'){
+    // 12-month data
+    const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const curYear=today.getFullYear(),curMonth=today.getMonth();
+    const monthsData=[];
+    for(let m=11;m>=0;m--){
+      const d=new Date(curYear,curMonth-m,1);
+      const yr=d.getFullYear(),mo=d.getMonth();
+      const prefix=`${yr}-${String(mo+1).padStart(2,'0')}`;
+      let mTotal=0;
+      Object.keys(S.logs).forEach(dayKey=>{
+        if(dayKey.startsWith(prefix)) mTotal+=(S.logs[dayKey]||[]).length;
+      });
+      monthsData.push({label:monthNames[mo],count:mTotal,isCurrent:m===0});
+    }
+    const maxMonth=Math.max(...monthsData.map(x=>x.count),1);
 
-  return`<div class="stat-grid">
-    <div class="stat-card"><span class="stat-num">${wk}</span><span class="stat-lbl">Check-ins this week</span></div>
-    <div class="stat-card"><span class="stat-num">${cons}%</span><span class="stat-lbl">30-day consistency</span></div>
-    <div class="stat-card"><span class="stat-num">${best}</span><span class="stat-lbl">Best streak (days)</span></div>
-  </div>
-  <div class="card card-p">
-    <div class="card-title">Last 7 Days</div>
-    <div class="bar-chart">${barHTML}</div>
-  </div>
-  <div class="card card-p">
-    <div class="card-title">Weekly Goals</div>
-    <div class="hp-list">${habitBars}</div>
-  </div>
-  <div class="card card-p">
-    <div class="card-title">12-Week Heatmap</div>
-    <div class="hmap-wrap">
-      <svg viewBox="0 0 262 152" width="100%" role="img" aria-label="Activity heatmap">${cells}</svg>
+    const yBars=monthsData.map(m=>`<div class="y12-col">
+      <div class="y12-cnt">${m.count>0?m.count:''}</div>
+      <div class="y12-bar-wrap">
+        <div class="y12-bar${m.count===maxMonth&&m.count>0?' top':m.count>0?' hi':''}" style="height:${Math.max(4,Math.round((m.count/maxMonth)*80))}px" title="${m.label}: ${m.count} check-ins"></div>
+      </div>
+      <div class="y12-lbl" style="${m.isCurrent?'color:var(--accent)':''}">${m.label}</div>
+    </div>`).join('');
+
+    // 52-week heatmap
+    const startYear=addDays(monday(today),-364);
+    let cellsYear='';
+    for(let w=0;w<52;w++)for(let d=0;d<7;d++){
+      const dt=addDays(startYear,w*7+d);if(dt>today)continue;
+      const cnt=(S.logs[iso(dt)]||[]).length;
+      const p=H.length?cnt/H.length:0;
+      const op=p===0?0:(.2+p*.8);
+      cellsYear+=`<rect x="${w*13}" y="${d*14}" width="10" height="11" rx="2.5"
+        fill="${p?'var(--accent)':'var(--surface2)'}" ${p?`fill-opacity="${op.toFixed(2)}"`:''}>
+        <title>${iso(dt)}: ${cnt}/${H.length}</title></rect>`;
+    }
+
+    // Habit Hall of Fame (ranked by 365-day checkins)
+    const medals=['🥇','🥈','🥉','🏅','🏅','🏅','🏅','🏅'];
+    const sortedH=[...H].map(h=>({h,cnt:countDays(h.id,365),s:bestStreak(h.id)}))
+      .sort((a,b)=>b.cnt-a.cnt);
+
+    const hofRows=sortedH.map((item,idx)=>`<div class="hof-row">
+      <div class="hof-rank">${medals[idx]||'•'}</div>
+      <div class="hab-ico" style="background:${item.h.color}1a;border-radius:12px;width:38px;height:38px;font-size:20px;display:grid;place-items:center;flex-shrink:0">${item.h.emoji}</div>
+      <div class="mg-info">
+        <span class="mg-name">${esc(item.h.name)}</span>
+        <span class="mg-goal">${item.cnt} check-ins in the year · Best ${item.s}d streak</span>
+      </div>
+    </div>`).join('');
+
+    content=`
+      <div class="stat-grid">
+        <div class="stat-card"><span class="stat-num">${totalYear}</span><span class="stat-lbl">Annual check-ins</span></div>
+        <div class="stat-card"><span class="stat-num">${yearCons}%</span><span class="stat-lbl">Yearly consistency</span></div>
+        <div class="stat-card"><span class="stat-num">${bestAll}d</span><span class="stat-lbl">All-time best streak</span></div>
+      </div>
+      <div class="card card-p">
+        <div class="card-title">12-Month Check-in Trend</div>
+        <p class="chart-subtitle">Volume of completed habits across the past year</p>
+        <div class="y12-chart">${yBars}</div>
+      </div>
+      <div class="card card-p">
+        <div class="card-title">52-Week Full Heatmap</div>
+        <div class="hmap-wrap">
+          <svg viewBox="0 0 680 105" width="680" height="105" role="img" aria-label="52-week heatmap">${cellsYear}</svg>
+        </div>
+        <div class="hmap-legend">
+          <span>52 weeks ago</span>
+          <span>Today</span>
+        </div>
+      </div>
+      <div class="card card-p">
+        <div class="card-title">Habit Hall of Fame 🏆</div>
+        <div>${hofRows}</div>
+      </div>
+    `;
+  }
+
+  return tfSelector + achBanner + content;
+}
+
+/* ── ACHIEVEMENT MODAL & CANVAS ───────────────────────── */
+function openAchievementModal(selTf='week'){
+  let curTf=selTf;
+  const ov=document.createElement('div');
+  ov.className='sh-bg';
+  ov.innerHTML=`<div class="sh" role="dialog" aria-modal="true" style="max-height:94%">
+    <div class="sh-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <h3 style="margin:0">🏆 Achievement Card</h3>
+      <span style="font-size:12px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:4px 10px;border-radius:20px">SHAREABLE</span>
     </div>
-    <div class="hmap-legend">
-      <span>12 weeks ago</span>
-      <div class="hmap-swatches">Less ${swatches} More</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Your verified milestone certificate. Download or share with friends!</p>
+    
+    <div class="tf-nav" id="ach-tf-wrap">
+      <button class="tf-btn ${curTf==='week'?'on':''}" data-atf="week">Weekly</button>
+      <button class="tf-btn ${curTf==='month'?'on':''}" data-atf="month">Monthly</button>
+      <button class="tf-btn ${curTf==='year'?'on':''}" data-atf="year">Yearly</button>
+      <button class="tf-btn ${curTf==='all'?'on':''}" data-atf="all">All-Time</button>
+    </div>
+
+    <div class="modal-canvas-wrap">
+      <canvas id="ach-canvas" width="1080" height="1350"></canvas>
+    </div>
+
+    <div class="btn-col" style="margin-top:14px;gap:8px">
+      <button class="btn btn-p" id="ach-btn-dl">⬇️ Download Card (PNG)</button>
+      <div class="btn-row">
+        <button class="btn btn-s" id="ach-btn-share">📲 Share Card</button>
+        <button class="btn btn-s" id="ach-btn-export">📊 Export Data (JSON)</button>
+      </div>
+      <button class="btn btn-d" id="ach-btn-close">Close</button>
     </div>
   </div>`;
+
+  $('#app').appendChild(ov);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>ov.classList.add('vis')));
+
+  const canvas=ov.querySelector('#ach-canvas');
+  drawAchievementCanvas(canvas,curTf);
+
+  const close=()=>{
+    ov.classList.remove('vis');
+    setTimeout(()=>ov.remove(),350);
+  };
+  ov.addEventListener('click',e=>{if(e.target===ov)close()});
+  ov.querySelector('#ach-btn-close').onclick=close;
+
+  // Timeframe selector inside modal
+  ov.querySelector('#ach-tf-wrap').addEventListener('click',e=>{
+    const b=e.target.closest('[data-atf]');
+    if(!b)return;
+    curTf=b.dataset.atf;
+    ov.querySelectorAll('#ach-tf-wrap .tf-btn').forEach(btn=>btn.classList.toggle('on',btn===b));
+    drawAchievementCanvas(canvas,curTf);
+  });
+
+  // Download PNG
+  ov.querySelector('#ach-btn-dl').onclick=()=>{
+    canvas.toBlob(blob=>{
+      if(!blob){toast('❌ Could not generate image');return}
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;
+      a.download=`stride-achievement-${curTf}-${iso(new Date())}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast('🏆 Achievement Card saved to downloads!');
+    },'image/png');
+  };
+
+  // Share
+  ov.querySelector('#ach-btn-share').onclick=async()=>{
+    if(navigator.share&&navigator.canShare){
+      canvas.toBlob(async blob=>{
+        if(!blob)return;
+        const file=new File([blob],`stride-achievement-${curTf}.png`,{type:'image/png'});
+        if(navigator.canShare({files:[file]})){
+          try{
+            await navigator.share({
+              title:'My Stride Habit Achievement',
+              text:'Tracking my habits with Stride! Here is my progress certificate 🏃🔥',
+              files:[file]
+            });
+            toast('✅ Shared successfully!');
+            return;
+          }catch(err){}
+        }
+        // Fallback
+        ov.querySelector('#ach-btn-dl').click();
+      },'image/png');
+    }else{
+      ov.querySelector('#ach-btn-dl').click();
+    }
+  };
+
+  // Export JSON
+  ov.querySelector('#ach-btn-export').onclick=async()=>{
+    try{
+      const data=await api('/api/export');
+      const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;
+      a.download=`stride-backup-${iso(new Date())}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast('📊 All habit data exported as JSON!');
+    }catch(err){
+      toast('❌ Export failed');
+    }
+  };
+}
+
+/* ── CANVAS RENDER ENGINE ────────────────────────────── */
+function drawAchievementCanvas(canvas,tf){
+  const ctx=canvas.getContext('2d');
+  const W=1080,H=1350;
+  ctx.clearRect(0,0,W,H);
+
+  const today=new Date();
+  const habitList=S.habits;
+
+  // Compute metrics based on timeframe
+  let daysCount=7,tfLabel='WEEKLY PROGRESS CERTIFICATE';
+  if(tf==='month'){daysCount=30;tfLabel='30-DAY HABIT RECORD';}
+  else if(tf==='year'){daysCount=365;tfLabel='ANNUAL CONSISTENCY CERTIFICATE';}
+  else if(tf==='all'){daysCount=365;tfLabel='LIFETIME ACHIEVEMENT AWARD';}
+
+  let totalCheckins=0;
+  for(let i=0;i<daysCount;i++){
+    const d=iso(addDays(today,-i));
+    totalCheckins+=(S.logs[d]||[]).length;
+  }
+  const possible=daysCount*Math.max(habitList.length,1);
+  const consistency=Math.min(100,Math.round((totalCheckins/possible)*100));
+  const bestStreakVal=habitList.length?Math.max(...habitList.map(h=>bestStreak(h.id))):0;
+  const ach=getAchievement(totalCheckins,bestStreakVal);
+
+  // 1. Background gradient
+  const bgGrad=ctx.createLinearGradient(0,0,W,H);
+  bgGrad.addColorStop(0,'#0d0d12');
+  bgGrad.addColorStop(0.5,'#14141e');
+  bgGrad.addColorStop(1,'#09090d');
+  ctx.fillStyle=bgGrad;
+  ctx.fillRect(0,0,W,H);
+
+  // 2. Ambient background glows
+  const glow1=ctx.createRadialGradient(200,220,10,200,220,450);
+  glow1.addColorStop(0,'rgba(252,76,2,0.22)');
+  glow1.addColorStop(1,'rgba(252,76,2,0)');
+  ctx.fillStyle=glow1;
+  ctx.fillRect(0,0,W,H);
+
+  const glow2=ctx.createRadialGradient(880,1000,10,880,1000,500);
+  glow2.addColorStop(0,'rgba(142,68,173,0.18)');
+  glow2.addColorStop(1,'rgba(142,68,173,0)');
+  ctx.fillStyle=glow2;
+  ctx.fillRect(0,0,W,H);
+
+  // 3. Inner Card outline
+  ctx.save();
+  ctx.lineWidth=2;
+  ctx.strokeStyle='rgba(255,255,255,0.1)';
+  roundRect(ctx,50,50,W-100,H-100,44);
+  ctx.stroke();
+  ctx.restore();
+
+  // 4. Header branding
+  ctx.fillStyle='#fc4c02';
+  ctx.font='italic 800 42px Barlow, sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('STRIDE',W/2,130);
+
+  ctx.fillStyle='rgba(255,255,255,0.6)';
+  ctx.font='600 18px Barlow, sans-serif';
+  ctx.letterSpacing='4px';
+  ctx.fillText(tfLabel,W/2,170);
+
+  // 5. Badge Box & Icon
+  ctx.save();
+  const badgeBoxY=220;
+  const bGrad=ctx.createLinearGradient(W/2-80,badgeBoxY,W/2+80,badgeBoxY+160);
+  bGrad.addColorStop(0,'rgba(252,76,2,0.25)');
+  bGrad.addColorStop(1,'rgba(255,107,53,0.08)');
+  ctx.fillStyle=bGrad;
+  ctx.strokeStyle='rgba(252,76,2,0.5)';
+  ctx.lineWidth=3;
+  roundRect(ctx,W/2-80,badgeBoxY,160,160,36);
+  ctx.fill();
+  ctx.stroke();
+
+  // Emoji
+  ctx.font='80px Apple Color Emoji, Segoe UI Emoji, sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText(ach.emoji,W/2,badgeBoxY+110);
+  ctx.restore();
+
+  // 6. Title and Rank
+  ctx.fillStyle='#ffffff';
+  ctx.font='italic 800 48px Barlow, sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText(ach.title.toUpperCase(),W/2,440);
+
+  ctx.fillStyle='#fc4c02';
+  ctx.font='700 22px Barlow, sans-serif';
+  ctx.fillText(ach.rank.toUpperCase(),W/2,480);
+
+  ctx.fillStyle='rgba(255,255,255,0.65)';
+  ctx.font='500 20px Barlow, sans-serif';
+  ctx.fillText(ach.desc,W/2,516);
+
+  // 7. Stat Cards (3 Columns)
+  const statY=570,statW=280,statH=160,gap=30;
+  const startX=W/2-(statW*3+gap*2)/2;
+
+  const stats=[
+    {num:String(totalCheckins),lbl:'TOTAL CHECK-INS',sub:daysCount+' days'},
+    {num:consistency+'%',lbl:'CONSISTENCY',sub:'verified rate'},
+    {num:bestStreakVal+'d',lbl:'PEAK STREAK',sub:'consecutive days'}
+  ];
+
+  stats.forEach((st,i)=>{
+    const x=startX+i*(statW+gap);
+    ctx.save();
+    ctx.fillStyle='rgba(255,255,255,0.04)';
+    ctx.strokeStyle='rgba(255,255,255,0.1)';
+    ctx.lineWidth=1.5;
+    roundRect(ctx,x,statY,statW,statH,24);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle='#ffffff';
+    ctx.font='italic 800 50px Barlow, sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(st.num,x+statW/2,statY+72);
+
+    ctx.fillStyle='#fc4c02';
+    ctx.font='700 14px Barlow, sans-serif';
+    ctx.fillText(st.lbl,x+statW/2,statY+108);
+
+    ctx.fillStyle='rgba(255,255,255,0.45)';
+    ctx.font='500 13px Barlow, sans-serif';
+    ctx.fillText(st.sub,x+statW/2,statY+134);
+    ctx.restore();
+  });
+
+  // 8. Habit Showcase
+  const habitY=780;
+  ctx.fillStyle='rgba(255,255,255,0.45)';
+  ctx.font='700 14px Barlow, sans-serif';
+  ctx.textAlign='left';
+  ctx.fillText('TOP HABITS SHOWCASE',startX,habitY-16);
+
+  const topHabits=[...habitList].slice(0,4);
+  topHabits.forEach((h,idx)=>{
+    const rowY=habitY+idx*88;
+    const s=streak(h.id);
+    const cnt=countDays(h.id,daysCount);
+
+    ctx.save();
+    ctx.fillStyle='rgba(255,255,255,0.03)';
+    ctx.strokeStyle='rgba(255,255,255,0.08)';
+    ctx.lineWidth=1;
+    roundRect(ctx,startX,rowY,statW*3+gap*2,74,18);
+    ctx.fill();
+    ctx.stroke();
+
+    // Icon container
+    ctx.fillStyle=h.color+'28';
+    roundRect(ctx,startX+14,rowY+12,50,50,14);
+    ctx.fill();
+    ctx.font='28px Apple Color Emoji, Segoe UI Emoji, sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(h.emoji,startX+39,rowY+48);
+
+    // Name
+    ctx.fillStyle='#ffffff';
+    ctx.font='700 22px Barlow, sans-serif';
+    ctx.textAlign='left';
+    ctx.fillText(h.name.length>22?h.name.slice(0,20)+'…':h.name,startX+78,rowY+38);
+
+    // Streak / Count
+    ctx.fillStyle='rgba(255,255,255,0.6)';
+    ctx.font='500 16px Barlow, sans-serif';
+    ctx.fillText(`🔥 ${s}-day streak  ·  ${cnt} check-ins`,startX+78,rowY+60);
+
+    // Accent indicator
+    ctx.fillStyle=h.color;
+    roundRect(ctx,startX+(statW*3+gap*2)-14,rowY+18,6,38,3);
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // 9. Motivational quote
+  ctx.fillStyle='rgba(255,255,255,0.65)';
+  ctx.font='italic 500 20px Barlow, sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('“Small daily disciplines repeated with consistency lead to great achievements.”',W/2,1180);
+
+  // 10. Footer stamp
+  const dateStr=today.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
+  ctx.fillStyle='rgba(255,255,255,0.4)';
+  ctx.font='600 16px Barlow, sans-serif';
+  ctx.fillText(`VERIFIED ON ${dateStr.toUpperCase()}  ·  STRIDE HABIT TRACKER`,W/2,1235);
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
 }
 
 /* ── VIEW: HABITS ────────────────────────────────────── */
@@ -667,7 +1237,12 @@ function render(){
 /* ── EVENTS ──────────────────────────────────────────── */
 $('#main').addEventListener('click',e=>{
   const t=e.target.closest('[data-t]'),x=e.target.closest('[data-e]');
-  if(t)toggle(t.dataset.t);if(x)sheet(x.dataset.e);
+  const tf=e.target.closest('.tf-btn');
+  const ach=e.target.closest('[data-act="ach-modal"]');
+  if(t)toggle(t.dataset.t);
+  if(x)sheet(x.dataset.e);
+  if(tf){statsTimeframe=tf.dataset.tf;renderMain()}
+  if(ach)openAchievementModal(statsTimeframe);
 });
 $('#nav').addEventListener('click',e=>{
   const b=e.target.closest('button[data-v]');

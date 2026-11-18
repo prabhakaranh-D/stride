@@ -132,13 +132,27 @@ def delete_habit(hid):
 @app.get("/api/logs")
 def get_logs():
     """Returns {"2026-11-18": ["habitId", ...]} for the last N days."""
-    days = min(365, max(1, request.args.get("days", 120, type=int)))
+    days = min(730, max(1, request.args.get("days", 365, type=int)))
     since = (date.today() - timedelta(days=days)).isoformat()
     rows = db().execute("SELECT habit_id, day FROM logs WHERE day >= ?", (since,)).fetchall()
     out = {}
     for r in rows:
         out.setdefault(r["day"], []).append(r["habit_id"])
     return jsonify(out)
+
+
+@app.get("/api/export")
+def export_data():
+    """Export all habits, logs, and calculated stats as JSON download."""
+    habits = [dict(r) for r in db().execute("SELECT * FROM habits ORDER BY created_at").fetchall()]
+    logs = [dict(r) for r in db().execute("SELECT habit_id, day FROM logs ORDER BY day DESC").fetchall()]
+    return jsonify({
+        "exported_at": date.today().isoformat(),
+        "total_habits": len(habits),
+        "total_checkins": len(logs),
+        "habits": habits,
+        "logs": logs
+    })
 
 
 @app.post("/api/habits/<hid>/toggle")
