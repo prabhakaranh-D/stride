@@ -1,12 +1,54 @@
 {
   "name": "Stride Habit Tracker",
   "short_name": "Stride",
+  "description": "Build powerful habits, one day at a time. Track streaks, set weekly goals, and stay consistent.",
+  "lang": "en",
+  "dir": "ltr",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#f4f4f2",
   "theme_color": "#fc4c02",
+  "categories": ["health", "fitness", "lifestyle", "productivity"],
+  "scope_extensions": [],
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "shortcuts": [
+    {
+      "name": "Log Today's Habits",
+      "short_name": "Today",
+      "description": "Quickly mark today's habits as done",
+      "url": "/?view=today",
+      "icons": [{ "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "View Progress",
+      "short_name": "Progress",
+      "description": "See your streaks and consistency stats",
+      "url": "/?view=stats",
+      "icons": [{ "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Manage Habits",
+      "short_name": "Habits",
+      "description": "Add or edit your habits",
+      "url": "/?view=habits",
+      "icons": [{ "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+  "share_target": {
+    "action": "/share-target",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
   "icons": [
-    {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
-    {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+    { "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }
