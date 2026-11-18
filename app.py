@@ -221,6 +221,24 @@ def share_target():
     return send_from_directory("static", "index.html")
 
 
+@app.get("/.well-known/assetlinks.json")
+def assetlinks():
+    """Serve Digital Asset Links for Android Trusted Web Activity (TWA)."""
+    well_known_dir = os.path.join(app.root_path, "static", ".well-known")
+    if os.path.exists(os.path.join(well_known_dir, "assetlinks.json")):
+        return send_from_directory(well_known_dir, "assetlinks.json", mimetype="application/json")
+    return jsonify([{
+        "relation": ["delegate_permission/common.handle_all_urls"],
+        "target": {
+            "namespace": "android_app",
+            "package_name": "com.onrender.stride_2_83gv.twa",
+            "sha256_cert_fingerprints": [
+                "58:70:CD:88:97:CE:A9:21:12:30:DA:43:66:7D:35:9C:EF:9A:26:AD:5B:D9:D9:64:93:1B:39:78:AD:67:8C:22"
+            ]
+        }
+    }])
+
+
 # ---------- demo data ----------
 def seed():
     init_db()
